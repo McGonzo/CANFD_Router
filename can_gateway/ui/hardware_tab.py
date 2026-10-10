@@ -84,6 +84,7 @@ class HardwareTab(QWidget):
         self.add_virtual_btn.clicked.connect(self.add_virtual_ports)
         self.browser_btn.clicked.connect(self.open_dbc_browser)
         self.edit_btn.clicked.connect(self.edit_hardware)
+        self.table.cellDoubleClicked.connect(self._edit_double_clicked_row)
         self.remove_btn.clicked.connect(self.remove_hardware)
         self.up_btn.clicked.connect(self.move_up)
         self.down_btn.clicked.connect(self.move_down)
@@ -135,13 +136,18 @@ class HardwareTab(QWidget):
             extra = dict(device.capabilities)
             extra["device_id"] = device.device_id
             if extra.get("fd", "no").lower() == "yes":
-                extra.setdefault("vector_fd_sample_point_abr", "80.0")
-                extra.setdefault("vector_fd_sample_point_dbr", "80.0")
+                if str(device.driver or "").lower() == "testbase":
+                    extra.setdefault("testbase_fd_sample_point_abr", "80.0")
+                    extra.setdefault("testbase_fd_sample_point_dbr", "80.0")
+                else:
+                    extra.setdefault("vector_fd_sample_point_abr", "80.0")
+                    extra.setdefault("vector_fd_sample_point_dbr", "80.0")
             cfg = HardwareConfig(
                 name=name,
                 driver=device.capabilities.get("registry_key", device.driver),
                 channel=device.channel,
                 fd=device.capabilities.get("fd", "no").lower() == "yes",
+                serial=device.capabilities.get("serial", ""),
                 order=len(self._hardware),
                 extra=extra,
             )
@@ -222,6 +228,12 @@ class HardwareTab(QWidget):
         self._normalize_order()
         self._refresh_table()
         self.changed.emit()
+
+    def _edit_double_clicked_row(self, row: int, _column: int) -> None:
+        if row < 0 or row >= len(self._hardware):
+            return
+        self.table.selectRow(row)
+        self.edit_hardware()
 
     def remove_hardware(self) -> None:
         row = self._selected_row()

@@ -28,6 +28,7 @@ class ArxmlSignal:
     maximum: float | None = None
     initial: float = 0.0
     unit: str = ""
+    choices: Dict[float, str] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -266,7 +267,11 @@ class ArxmlDatabase:
             length = _safe_int(_child_text(element, "LENGTH"), 0)
             initial = _safe_float(_first_child_text(element, "VALUE"), 0.0)
             compu_ref = _first_ref_text(element, "COMPU-METHOD-REF")
-            scale, offset, minimum, maximum = compu.get(compu_ref, (1.0, 0.0, None, None))
+            if not compu_ref and system_ref:
+                system_signal = _lookup_ref(by_path, system_ref)
+                if system_signal is not None:
+                    compu_ref = _first_ref_text(system_signal, "COMPU-METHOD-REF")
+            scale, offset, minimum, maximum, choices = _lookup_ref(compu, compu_ref) or (1.0, 0.0, None, None, {})
             signal = ArxmlSignal(
                 name=name,
                 ref=ref,
@@ -277,6 +282,7 @@ class ArxmlDatabase:
                 minimum=minimum,
                 maximum=maximum,
                 initial=initial,
+                choices=dict(choices),
             )
             out[ref] = signal
         return out
@@ -285,8 +291,8 @@ class ArxmlDatabase:
         self,
         by_path: Dict[str, ET.Element],
         by_tag: Dict[str, List[ET.Element]],
-    ) -> Dict[str, tuple[float, float, float | None, float | None]]:
-        out: Dict[str, tuple[float, float, float | None, float | None]] = {}
+    ) -> Dict[str, tuple[float, float, float | None, float | None, Dict[float, str]]]:
+        out = {}
         for element in by_tag.get("COMPU-METHOD", []):
             ref = self._path(element)
             numbers = [_safe_float(item.text, 0.0) for item in element.iter() if _local(item.tag) == "V"]
@@ -311,7 +317,17 @@ class ArxmlDatabase:
             ]
             lower = min(scaled_limits) if scaled_limits else None
             upper = max(scaled_limits) if scaled_limits else None
-            out[ref] = (scale, offset, lower, upper)
+            choices: Dict[float, str] = {}
+            for entry in element.iter():
+                if _local(entry.tag) != "COMPU-SCALE":
+                    continue
+                label = _first_child_text(entry, "VT")
+                low_text = _child_text(entry, "LOWER-LIMIT")
+                high_text = _child_text(entry, "UPPER-LIMIT")
+                # A range label is not an individual enum value.
+                if label and low_text and (not high_text or _safe_float(low_text, 0) == _safe_float(high_text, 0)):
+                    choices[_safe_float(low_text, 0)] = label
+            out[ref] = (scale, offset, lower, upper, choices)
         return out
 
     def _load_pdus(
@@ -356,6 +372,8 @@ class ArxmlDatabase:
                         minimum=base.minimum,
                         maximum=base.maximum,
                         initial=base.initial,
+                        unit=base.unit,
+                        choices=dict(base.choices),
                     )
                 )
             out[ref] = pdu

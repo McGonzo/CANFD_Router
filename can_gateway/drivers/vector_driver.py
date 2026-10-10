@@ -1357,7 +1357,7 @@ class VectorAdapter(BusAdapter):
         event.canMsg.canId = arbitration_id
         if frame.is_fd:
             event.canMsg.msgFlags = XL_CAN_TXMSG_FLAG_EDL
-            if self._config.fd:
+            if (frame.bitrate_switch if frame.bitrate_switch is not None else self._config.fd):
                 event.canMsg.msgFlags |= XL_CAN_TXMSG_FLAG_BRS
             data_len = min(len(frame.data), 64)
             event.canMsg.dlc = _len_to_dlc(data_len)

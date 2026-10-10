@@ -139,6 +139,8 @@ venv.bak/
 # Local application state
 save/
 configs/.last_session*.json
+logs/
+*.log
 
 # Local-only project materials
 configs/
@@ -158,6 +160,16 @@ zlgcan*.zip
 
 # Assistant/editor metadata
 .codebuddy/
+.vscode/
+.idea/
+*.code-workspace
+*.swp
+*.swo
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini
 
 # Spyder project settings
 .spyderproject
@@ -207,3 +219,4 @@ _test_v4.py
 HT11_ZP22_PUMACAN.dbc
 run.txt
 .vscode/settings.json
+/docs

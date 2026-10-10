@@ -706,7 +706,7 @@ class ZLGAdapter(BusAdapter):
                 CAN_EFF_FLAG if frame.is_extended_id else 0
             )
             tx.frame.len = max(0, min(len(frame.data), 64))
-            tx.frame.flags = CANFD_BRS if self._config.fd else 0
+            tx.frame.flags = CANFD_BRS if (frame.bitrate_switch if frame.bitrate_switch is not None else self._config.fd) else 0
             for idx, value in enumerate(frame.data[:64]):
                 tx.frame.data[idx] = int(value) & 0xFF
             sent = int(self._shared.dll.dll.ZCAN_TransmitFD(channel, C.byref(tx), 1))

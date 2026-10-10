@@ -8,6 +8,7 @@ class Frame:
     data: bytes
     is_fd: bool = False
     is_extended_id: bool = False
+    bitrate_switch: bool | None = None
     timestamp: float = field(default_factory=time)
     channel: str = ""
     is_error: bool = False

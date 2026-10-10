@@ -67,7 +67,7 @@ def _sample_point_from_extra(extra: dict, primary: str, fallback: str) -> float:
 
 
 def _driver_supports_sample_point(driver_name: str) -> bool:
-    return driver_name.strip().lower() == "vector"
+    return driver_name.strip().lower() in {"vector", "testbase"}
 
 
 def _algorithm_kind_from_combo(value: object) -> AlgorithmKind:
@@ -178,14 +178,22 @@ class HardwareDialog(QDialog):
             self.nominal_sample_point_input.setValue(
                 _sample_point_from_extra(
                     initial.extra,
-                    "vector_fd_sample_point_abr",
+                    (
+                        "testbase_fd_sample_point_abr"
+                        if initial.driver.strip().lower() == "testbase"
+                        else "vector_fd_sample_point_abr"
+                    ),
                     "vector_fd_nominal_sample_point",
                 )
             )
             self.data_sample_point_input.setValue(
                 _sample_point_from_extra(
                     initial.extra,
-                    "vector_fd_sample_point_dbr",
+                    (
+                        "testbase_fd_sample_point_dbr"
+                        if initial.driver.strip().lower() == "testbase"
+                        else "vector_fd_sample_point_dbr"
+                    ),
                     "vector_fd_data_sample_point",
                 )
             )
@@ -227,15 +235,20 @@ class HardwareDialog(QDialog):
             self.cluster_input.clear()
 
     def _refresh_sample_point_enabled(self) -> None:
-        supports_sample_point = _driver_supports_sample_point(
-            self.driver_input.currentText()
-        )
+        driver = self.driver_input.currentText().strip().lower()
+        supports_sample_point = _driver_supports_sample_point(driver)
         enabled = bool(self.fd_input.isChecked()) and supports_sample_point
+        if driver == "testbase" and not self.fd_input.isChecked():
+            self.nominal_sample_point_input.setValue(75.0)
         reason = ""
         if not self.fd_input.isChecked():
-            reason = "Sample point is applied only when CAN FD is enabled."
+            reason = (
+                "TestBase classic CAN uses its fixed 75% sample point."
+                if driver == "testbase"
+                else "Sample point is applied only when CAN FD is enabled."
+            )
         elif not supports_sample_point:
-            reason = "Sample point is currently applied only by the Vector CAN FD driver."
+            reason = "Sample point is currently applied by Vector and TestBase CAN FD drivers."
         for widget in (
             self.nominal_sample_point_input,
             self.data_sample_point_input,
@@ -286,8 +299,21 @@ class HardwareDialog(QDialog):
             else ""
         )
         extra = dict(self._initial_extra)
-        extra["vector_fd_sample_point_abr"] = f"{self.nominal_sample_point_input.value():.1f}"
-        extra["vector_fd_sample_point_dbr"] = f"{self.data_sample_point_input.value():.1f}"
+        driver = self.driver_input.currentText().strip().lower()
+        if driver == "testbase" and self.fd_input.isChecked():
+            extra["testbase_fd_sample_point_abr"] = (
+                f"{self.nominal_sample_point_input.value():.1f}"
+            )
+            extra["testbase_fd_sample_point_dbr"] = (
+                f"{self.data_sample_point_input.value():.1f}"
+            )
+        elif driver == "vector":
+            extra["vector_fd_sample_point_abr"] = (
+                f"{self.nominal_sample_point_input.value():.1f}"
+            )
+            extra["vector_fd_sample_point_dbr"] = (
+                f"{self.data_sample_point_input.value():.1f}"
+            )
         return HardwareConfig(
             name=self.name_input.text().strip(),
             driver=self.driver_input.currentText().strip(),

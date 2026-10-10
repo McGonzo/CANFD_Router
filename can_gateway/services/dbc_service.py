@@ -94,14 +94,19 @@ class DbcService:
         db = self._db_cache.get(normalized)
         if db is None or self._db_cache_signature.get(normalized) != signature:
             try:
-                db = cantools.database.load_file(normalized, strict=True)
+                Path(normalized).read_bytes().decode("utf-8-sig")
+                encoding = "utf-8-sig"
+            except UnicodeDecodeError:
+                encoding = None  # Retain cantools' legacy DBC encoding fallback.
+            try:
+                db = cantools.database.load_file(normalized, strict=True, encoding=encoding)
                 self._db_mode[normalized] = "strict"
                 self._db_warning.pop(normalized, None)
             except Exception as strict_exc:
                 # Compatible mode tolerates some non-standard DBC definitions
                 # (e.g., overlap and signal-size inconsistencies).
                 try:
-                    db = cantools.database.load_file(normalized, strict=False)
+                    db = cantools.database.load_file(normalized, strict=False, encoding=encoding)
                     self._db_mode[normalized] = "compatible"
                     self._db_warning[normalized] = self._format_compat_note(
                         str(strict_exc)
@@ -315,6 +320,7 @@ class DbcService:
                     frame_id=int(msg.frame_id),
                     length=int(msg.length),
                     cycle_time_ms=(
+                        msg.cycle_time_ms if isinstance(db, ArxmlDatabase) else
                         int(msg.cycle_time) if getattr(msg, "cycle_time", None) is not None else None
                     ),
                     signals=signals,
@@ -397,6 +403,21 @@ class DbcService:
         msg = db.get_message_by_frame_id(frame.arbitration_id)
         signals = msg.decode(frame.data, decode_choices=False, allow_truncated=True)
         return {"message_name": msg.name, "frame_id": msg.frame_id, "signals": signals}
+
+    def signal_choices(self, port_name: str, message_name: str, signal_name: str) -> Dict[float, str]:
+        """Return enum labels keyed by the physical values accepted by encode_message."""
+        db = self._get_db_for_port(port_name)
+        if isinstance(db, ArxmlDatabase):
+            message = db.get_message_by_name(self._cluster_for_port(port_name), message_name)
+        else:
+            message = db.get_message_by_name(message_name)
+        signal = next((item for item in message.signals if item.name == signal_name), None)
+        if signal is None:
+            return {}
+        return {
+            float(raw) * float(signal.scale) + float(signal.offset): str(label)
+            for raw, label in (signal.choices or {}).items()
+        }
 
     def default_signals(self, port_name: str, message_name: str) -> Dict[str, object]:
         db = self._get_db_for_port(port_name)

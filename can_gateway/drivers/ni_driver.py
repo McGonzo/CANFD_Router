@@ -114,6 +114,7 @@ class NIAdapter(BusAdapter):
             data=frame.data,
             is_fd=frame.is_fd,
             is_extended_id=frame.is_extended_id,
+            bitrate_switch=bool(frame.is_fd and (frame.bitrate_switch if frame.bitrate_switch is not None else False)),
         )
         self._bus.send(msg)
 

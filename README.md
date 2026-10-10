@@ -15,6 +15,10 @@ Windows-style desktop software for CAN/CAN FD routing, with per-port DBC binding
   - DBC Browser shows message DLC, including CANFD DLC > 8.
   - Port ordering, add/edit/remove.
   - One-click creation of 4 virtual CAN channels for offline testing.
+- Direct CAN Tool:
+  - Send area is split into `DBC/Signal Send` and `RAW CAN Send` tabs.
+  - RAW rows use a TSMaster-style editor with trigger and frame-type dropdowns, CAN ID, channel, DLC, BRS, D0-D7 byte cells, notes, one-shot send, and per-row periodic send.
+  - RAW frame types are standard data, extended data, FD standard, and FD extended. Selecting an FD DLC displays the full payload in the byte layout below the table, eight bytes per row, and edits are saved with the session.
 - Route configuration page:
   - Circuit-like topology panel.
   - Manual wiring by click: source port -> target port.
@@ -91,6 +95,9 @@ main.py
 - optional for NI-XNET support:
   - NI-XNET runtime/driver
   - Python package `nixnet`
+- optional for TestBase VCI support:
+  - TestBaseVCI Windows driver/runtime from the vendor SDK
+  - vendor API library `himetal3api.dll` installed with the TestBase driver/runtime
 
 Install:
 
@@ -140,4 +147,23 @@ You can start testing immediately without physical hardware.
 - ZLG now uses native `zlgcan` backend integration instead of generic `python-can` arguments.
 - If ZLG scan still returns empty, set environment variable `ZLGCAN_LIBPATH` to the folder containing ZLG native runtime libraries, then restart the app.
 - NI uses the NI-XNET backend and requires both NI-XNET runtime and Python package `nixnet` in the same Python environment that runs `main.py`.
+- Windows Python manager's `bin/python.exe` alias can cause NI-XNET enumeration error `0xBFF63014` despite reporting the same `sys.executable`. The application entry point detects that alias host and relaunches the actual Python interpreter before loading drivers, preserving arguments and exit status. `py -3 main.py` also runs the real interpreter directly.
 - Scan diagnostics will show missing runtime/module reasons when hardware cannot be discovered.
+
+## TestBase VCI
+
+- Install the TestBaseVCI device driver/runtime using the installer in the vendor SDK's `Bin/Windows` folder.
+- TestBase communication uses the vendor `himetal3api.dll` directly; no TestBase-specific Python package is required.
+- Scan devices in Hardware Config to discover each TestBase CAN-capable device and channel. The imported device identity is retained so multiple TestBase devices can be selected independently.
+- Select classic CAN or CAN FD in the hardware configuration and set the arbitration/data bitrates as required by the network.
+- For TestBase CAN FD, nominal and data sample-point settings are available and map to the closest SDK-supported values for the selected bitrates. TestBase classic CAN keeps its SDK 75% default; ZLG and NI continue using automatic/default timing.
+- Install the vendor driver/runtime separately. The supplied SDK contains only the Windows installer and import library, not the runtime DLL; this repository does not bundle vendor binaries.
+
+## Direct CAN: signal selection and recording
+
+- In **DBC/Signal Send**, **Add Signal** opens a checkable message/signal tree. Check a message to select all its signals, or check individual signals. Ctrl/Shift highlights multiple entries; **Check highlighted** checks them together. Search retains checks on hidden entries. Repeated additions are deduplicated.
+- Signals with DBC/ARXML enumeration labels show an **Enum** dropdown. Choosing a label updates the physical numeric **Value**, and numeric edits update the dropdown. Custom numeric values remain available. RC/CRC rows remain automatic.
+- In **Receive Recording**, use **Record Items** before **Start Record**. Select entire messages, individual signals, or discovered RAW CAN IDs. Without a database, start receiving first so the CAN IDs appear. Recording locks item selection and the receive port until stopped.
+- Recording uses actual received frames, limited to each database message's cycle time. Messages without a positive cycle time and RAW frames are recorded on every reception. The receive view's **Changes only** option does not suppress CSV records.
+- **Stop & Save** closes the record and opens a CSV save dialog. CSV contains one row per selected signal, or per selected RAW frame, including timestamp, elapsed time, port, CAN ID, frame flags, message/signal, numeric value, enum label and raw hex bytes. UTF-8 BOM keeps Chinese labels readable in Excel.
+- Logs are also retained under `logs/recordings` beside the application. Canceling Save As or a failed export keeps this original CSV; **Save CSV** retries export. Stopping reception, changing hardware, or closing the direct tool also stops recording. Earlier records are retained when a new session starts.

@@ -8,6 +8,7 @@ from can_gateway.drivers import (
     NIDriver,
     PythonCanDriver,
     SimVirtualDriver,
+    TestBaseDriver,
     VectorDriver,
     ZLGDriver,
 )
@@ -27,6 +28,7 @@ class DeviceRegistry:
     def _load_builtin_drivers(self) -> None:
         self.register_driver(SimVirtualDriver(channels=4))
         self.register_driver(NIDriver())
+        self.register_driver(TestBaseDriver())
         self.register_driver(VectorDriver())
         self.register_driver(ZLGDriver())
         for interface in ("pcan", "kvaser", "socketcan", "virtual"):
